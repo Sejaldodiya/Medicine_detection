@@ -185,18 +185,18 @@ ocr_list = medicines_list + ["amoxycillin"]
 
 # Dictionary containing medicine names and their information
 medicines_info = {
-    "Amlodipine": "Amlodipine is used to treat high blood pressure and chest pain.",
-    "Amoxicillin": "Amoxicillin is an antibiotic used to treat bacterial infections.",
-    "Amoxycillin": "Amoxycillin is another name for Amoxicillin, used to treat infections.",
-    "Atorvastatin": "Atorvastatin helps lower cholesterol and reduce heart disease risk.",
-    "Ciprofloxacin": "Ciprofloxacin is an antibiotic used to treat bacterial infections.",
-    "Ibuprofen": "Ibuprofen is a pain reliever and reduces inflammation.",
-    "Lisinopril": "Lisinopril is used to treat high blood pressure and heart failure.",
-    "Losartan": "Losartan helps lower blood pressure and protect the kidneys.",
-    "Metformin": "Metformin is used to treat type 2 diabetes by controlling blood sugar.",
-    "Omeprazole": "Omeprazole is used to reduce stomach acid and treat acid reflux.",
-    "Paracetamol": "Paracetamol is used for fever and pain relief.",
-    "Sertraline": "Sertraline is an antidepressant used to treat anxiety and depression."
+    "Amlodipine": "Amlodipine is a calcium channel blocker used to treat high blood pressure and angina by relaxing blood vessels and improving blood flow. It helps reduce the risk of heart attacks and strokes. Common side effects include dizziness, swelling, and fatigue.",
+    "Amoxicillin": "Amoxicillin is a broad-spectrum antibiotic used to treat bacterial infections, including respiratory, ear, throat, and urinary tract infections. It works by stopping bacterial growth. Common side effects include nausea, diarrhea, and rash.",
+    "Amoxycillin": "Amoxycillin is another name for Amoxicillin, Amoxycillin  is a penicillin-type antibiotic used to treat bacterial infections like respiratory, ear, throat, and urinary tract infections. It works by inhibiting bacterial growth. Common side effects include nausea, diarrhea, and skin rash.",
+    "Atorvastatin": "Atorvastatin is a statin medication used to lower cholesterol and reduce the risk of heart disease and stroke. It works by blocking cholesterol production in the liver. Common side effects include muscle pain, fatigue, and digestive issues.",
+    "Ciprofloxacin": "Ciprofloxacin is a fluoroquinolone antibiotic used to treat bacterial infections such as urinary tract infections, respiratory infections, and gastrointestinal infections. It works by inhibiting bacterial DNA replication. Common side effects include nausea, diarrhea, and dizziness.",
+    "Ibuprofen": "Ibuprofen is a nonsteroidal anti-inflammatory drug (NSAID) used to reduce pain, fever, and inflammation in conditions like headaches, muscle pain, arthritis, and menstrual cramps. Common side effects include stomach upset, nausea, and dizziness.",
+    "Lisinopril": "Lisinopril is an ACE inhibitor used to treat high blood pressure and heart failure and to improve survival after a heart attack. It works by relaxing blood vessels to lower blood pressure. Common side effects include dizziness, cough, and fatigue.",
+    "Losartan": "Losartan is an angiotensin II receptor blocker (ARB) used to treat high blood pressure and protect the kidneys in diabetic patients. It helps relax blood vessels, lowering blood pressure. Common side effects include dizziness, fatigue, and low blood pressure.",
+    "Metformin": "Metformin is an oral antidiabetic medication used to manage type 2 diabetes by lowering blood sugar levels and improving insulin sensitivity. Common side effects include nausea, diarrhea, and stomach upset.",
+    "Omeprazole": "Omeprazole is a proton pump inhibitor (PPI) used to treat acid reflux, ulcers, and GERD by reducing stomach acid production. Common side effects include headache, nausea, and stomach pain.",
+    "Paracetamol": "Paracetamol (Acetaminophen) is a pain reliever and fever reducer used for headaches, muscle pain, colds, and fever. Common side effects are rare but may include nausea or liver damage with high doses.",
+    "Sertraline": "Sertraline is a selective serotonin reuptake inhibitor (SSRI) used to treat depression, anxiety, OCD, and PTSD by increasing serotonin levels in the brain. Common side effects include nausea, dizziness, dry mouth, and insomnia."
 }
 
 # Convert medicine names to lowercase for case-insensitive comparison
@@ -259,7 +259,31 @@ def upload_image(image_data):
             raise FileNotFoundError(f"Image not found at {save_path}")
 
         print(f"Image saved at: {save_path}")
+        # Initialize EasyOCR Reader
+        reader = easyocr.Reader(['en'], gpu=False)
+        # Load image as numpy array
+        image_np = np.array(image)
 
+        # Perform OCR
+        text_ = reader.readtext(image_np)
+        found_medicine = None
+        threshold = 0.15
+
+        for bbox, detected_text, score in text_:
+            detected_text_cleaned = detected_text.strip().lower()
+            if detected_text_cleaned in ocr_list and score > threshold:
+                found_medicine = detected_text_cleaned
+                print(f"✅ Medicine Found: {found_medicine}")
+                break  # Stop after finding the first match
+
+
+        # Read image using OpenCV
+        img = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)  # Convert PIL image to OpenCV format
+
+        if not found_medicine:
+            print("❌ No medicine found in OCR. Skipping prediction.")
+            return
+        
         # Preprocess the image
         print("Preprocessing the image...")
         preprocessed_image = preprocess_image(image_data, TARGET_SIZE)
@@ -280,20 +304,6 @@ def upload_image(image_data):
         plt.axis('off')
         plt.title(f"Predicted Class: {predicted_class_label.capitalize()} (Confidence: {np.max(predictions):.2%})")
         plt.show()
-
-        # Run OCR after uploading
-        img = cv2.imread(save_path)
-
-        if img is None:
-            raise ValueError(f"Could not load the image at {save_path}")
-
-        # Initialize EasyOCR Reader
-        reader = easyocr.Reader(['en'], gpu=False)
-
-        # Perform OCR
-        text_ = reader.readtext(img)
-
-        threshold = 0.15
 
         # Iterate over each detected text
         for t_, t in enumerate(text_):
@@ -432,6 +442,17 @@ def upload_image_page():
         #remove-button:hover {
             background-color: #c82333;
         }
+         #output-messages {
+        margin-top: 20px;
+        padding: 10px;
+        background-color: #eef2ff;
+        border-left: 5px solid #007bff;
+        border-radius: 5px;
+        text-align: left;
+        font-size: 14px;
+        color: #333;
+        display: none; /* Initially hidden */
+    }
     </style>
     <div class="container">
         <h1>Image Upload and Prediction</h1>
@@ -439,7 +460,7 @@ def upload_image_page():
         <label for="file-upload">Upload File</label>
         <input type="file" id="file-upload" onchange="handleUpload(event)">
         <div id="image-container"></div>
-        <button id="remove-button" onclick="removeImage()">Remove Image</button>
+        
     </div>
     <script>
         function handleUpload(event) {
@@ -455,23 +476,17 @@ def upload_image_page():
                     imgElement.style.maxHeight = "400px";
                     imageContainer.appendChild(imgElement);
 
-                    // Show Remove button
-                    document.getElementById('remove-button').style.display = "inline-block";
+                   // Pass the image data to the Python environment
+                google.colab.kernel.invokeFunction('notebook.upload_image', [e.target.result], {})
+                    .catch(err => alert("Error processing image: " + err));
 
-                    // Pass the image data to the Python environment
-                    google.colab.kernel.invokeFunction('notebook.upload_image', [e.target.result], {});
+
                 };
                 reader.readAsDataURL(file);
             }
         }
 
-        function removeImage() {
-            // Clear image and hide the Remove button
-            document.getElementById('image-container').innerHTML = "";
-            document.getElementById('remove-button').style.display = "none";
-            alert("Please upload a new image.");
-
-        }
+        
     </script>
     """
     display(HTML(upload_html))
